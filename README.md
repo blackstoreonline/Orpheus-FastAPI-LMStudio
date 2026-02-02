@@ -164,8 +164,8 @@ curl http://localhost:5005/v1/speech/audio \
 | `input` | string | *required* | Text to convert (max 8192 chars) |
 | `model` | string | `"orpheus-2026"` | Model identifier |
 | `voice` | string | `"tara"` | Voice selection |
-| `response_format` | string | `"wav"` | Output format |
-| `speed` | float | `1.0` | Speed factor (0.25-4.0) |
+| `response_format` | string | `"wav"` | Output format (only 'wav' supported) |
+| `speed` | float | `1.0` | Speed factor (0.5-2.0) |
 
 ---
 
