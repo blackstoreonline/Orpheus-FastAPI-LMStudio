@@ -109,15 +109,15 @@ class SpeechRequest(BaseModel):
         default=DEFAULT_VOICE,
         description="The voice to use for synthesis"
     )
-    response_format: Literal["wav", "mp3", "opus", "aac", "flac", "pcm"] = Field(
+    response_format: Literal["wav"] = Field(
         default="wav",
-        description="The audio format for the output"
+        description="The audio format for the output (currently only 'wav' is supported)"
     )
     speed: float = Field(
         default=1.0,
-        ge=0.25,
-        le=4.0,
-        description="Speed of speech (0.25 to 4.0)"
+        ge=0.5,
+        le=2.0,
+        description="Speed of speech (0.5 to 2.0)"
     )
 
     @field_validator('voice')
