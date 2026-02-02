@@ -1,9 +1,11 @@
 """
-TTS Engine package for Orpheus text-to-speech system.
-
-This package contains the core components for audio generation:
-- inference.py: Token generation and API handling
-- speechpipe.py: Audio conversion pipeline
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  TTS Engine - Orpheus 2026 Neural Voice Synthesis                            ║
+║                                                                              ║
+║  Core components for audio generation:                                       ║
+║  • inference.py  - Token generation and LLM API handling                     ║
+║  • speechpipe.py - SNAC neural audio codec pipeline                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
 # Make key components available at package level
