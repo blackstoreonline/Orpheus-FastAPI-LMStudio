@@ -184,6 +184,14 @@ async def tokens_decoder(token_gen):
                         print(f"Processing speed: {tokens_per_sec:.1f} tokens/sec, buffer size: {len(buffer)}")
                     
                     yield audio_samples
+    
+    # Flush remaining buffer tokens at the end
+    if len(buffer) >= min_frames_required:
+        buffer_to_proc = buffer[-min_frames_required:]
+        print(f"Flushing final buffer with {len(buffer_to_proc)} tokens")
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with larger queue and parallel processing"""
@@ -213,21 +221,30 @@ def tokens_decoder_sync(syn_token_gen):
         start_time = time.time()
         chunk_count = 0
         
-        # Process audio chunks from the token decoder
-        async for audio_chunk in tokens_decoder(async_token_gen()):
-            audio_queue.put(audio_chunk)
-            chunk_count += 1
-            
-            # Log performance stats periodically
-            if chunk_count % 10 == 0:
-                elapsed = time.time() - start_time
-                print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
+        try:
+            # Process audio chunks from the token decoder
+            async for audio_chunk in tokens_decoder(async_token_gen()):
+                audio_queue.put(audio_chunk)
+                chunk_count += 1
                 
-        # Signal completion
-        audio_queue.put(None)  # Sentinel
+                # Log performance stats periodically
+                if chunk_count % 10 == 0:
+                    elapsed = time.time() - start_time
+                    print(f"Generated {chunk_count} chunks in {elapsed:.2f}s ({chunk_count/elapsed:.2f} chunks/sec)")
+        except Exception as e:
+            print(f"Error in async producer: {e}")
+        finally:
+            # Signal completion
+            audio_queue.put(None)  # Sentinel
 
     def run_async():
-        asyncio.run(async_producer())
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(async_producer())
+        finally:
+            loop.close()
 
     # Use a higher priority thread for RTX 4090 to ensure it stays fed with work
     thread = threading.Thread(target=run_async)
@@ -254,4 +271,7 @@ def tokens_decoder_sync(syn_token_gen):
     for chunk in audio_buffer:
         yield chunk
 
-    thread.join()
+    # Join thread with timeout to avoid hanging
+    thread.join(timeout=30)
+    if thread.is_alive():
+        print("Warning: Audio producer thread did not terminate cleanly within timeout")

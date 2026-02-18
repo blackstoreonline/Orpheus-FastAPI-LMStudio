@@ -7,6 +7,7 @@
 import os
 import time
 import uuid
+import json
 import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional, Union, Literal
@@ -232,7 +233,7 @@ async def _generate_speech(request: SpeechRequest) -> tuple[str, float]:
     start = time.time()
     
     # Run in thread pool to not block async
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         None,
         lambda: generate_speech_from_api(
@@ -259,6 +260,14 @@ async def create_speech_openai(request: SpeechRequest):
     try:
         output_path, generation_time = await _generate_speech(request)
         
+        # Verify file was created
+        if not os.path.exists(output_path):
+            return create_error_response(
+                "file_not_found",
+                "Generated audio file not found",
+                500
+            )
+        
         # Return audio file directly (OpenAI compatibility)
         return FileResponse(
             path=output_path,
@@ -270,6 +279,9 @@ async def create_speech_openai(request: SpeechRequest):
                 "X-Model": request.model
             }
         )
+    except asyncio.CancelledError:
+        # Re-raise to let FastAPI handle properly
+        raise
     except Exception as e:
         return create_error_response(
             "generation_failed",
@@ -300,17 +312,22 @@ async def speak_legacy(request: Request):
     """
     try:
         data = await request.json()
-    except Exception:
+    except json.JSONDecodeError:
         return create_error_response("invalid_json", "Invalid JSON in request body")
+    except Exception:
+        return create_error_response("invalid_request", "Failed to parse request body")
     
     text = data.get("text", "")
     voice = data.get("voice", DEFAULT_VOICE)
 
-    if not text:
-        return create_error_response("missing_text", "Missing 'text' field in request")
+    if not text or not text.strip():
+        return create_error_response("missing_text", "Missing or empty 'text' field in request")
 
     if voice not in AVAILABLE_VOICES:
-        voice = DEFAULT_VOICE
+        return create_error_response(
+            "invalid_voice",
+            f"Invalid voice '{voice}'. Must be one of: {', '.join(AVAILABLE_VOICES)}"
+        )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_path = f"outputs/{voice}_{timestamp}.wav"
@@ -319,11 +336,21 @@ async def speak_legacy(request: Request):
     start = time.time()
     
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: generate_speech_from_api(prompt=text, voice=voice, output_file=output_path)
         )
+        
+        # Verify file was created
+        if not os.path.exists(output_path):
+            return create_error_response(
+                "file_not_found",
+                "Generated audio file not found",
+                500
+            )
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         return create_error_response("generation_failed", f"Speech generation failed: {str(e)}", 500)
     
@@ -379,7 +406,15 @@ async def generate_from_web(
         )
     
     if voice not in AVAILABLE_VOICES:
-        voice = DEFAULT_VOICE
+        return templates.TemplateResponse(
+            "tts.html",
+            {
+                "request": request,
+                "error": f"Invalid voice '{voice}'. Please select a valid voice.",
+                "voices": AVAILABLE_VOICES,
+                "DEFAULT_VOICE": DEFAULT_VOICE
+            }
+        )
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_path = f"outputs/{voice}_{timestamp}.wav"
@@ -387,11 +422,25 @@ async def generate_from_web(
     start = time.time()
     
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: generate_speech_from_api(prompt=text, voice=voice, output_file=output_path)
         )
+        
+        # Verify file was created
+        if not os.path.exists(output_path):
+            return templates.TemplateResponse(
+                "tts.html",
+                {
+                    "request": request,
+                    "error": "Generation completed but audio file not found",
+                    "voices": AVAILABLE_VOICES,
+                    "DEFAULT_VOICE": DEFAULT_VOICE
+                }
+            )
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         return templates.TemplateResponse(
             "tts.html",

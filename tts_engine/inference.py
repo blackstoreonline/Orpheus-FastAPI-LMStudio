@@ -109,7 +109,7 @@ def format_prompt(prompt: str, voice: str = DEFAULT_VOICE) -> str:
 
 def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperature: float = TEMPERATURE, 
                            top_p: float = TOP_P, max_tokens: int = MAX_TOKENS, 
-                           repetition_penalty: float = REPETITION_PENALTY) -> Generator[str, None, None]:
+                           repetition_penalty: float = REPETITION_PENALTY) -> Optional[Generator[str, None, None]]:
     """Generate tokens from text using OpenAI-compatible API with optimized streaming and retry logic."""
     start_time = time.time()
     formatted_prompt = format_prompt(prompt, voice)
@@ -137,83 +137,87 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     retry_count = 0
     max_retries = 3
     
-    while retry_count < max_retries:
-        try:
-            # Make the API request with streaming and timeout
-            response = session.post(
-                API_URL, 
-                headers=HEADERS, 
-                json=payload, 
-                stream=True,
-                timeout=REQUEST_TIMEOUT
-            )
-            
-            if response.status_code != 200:
-                print(f"Error: API request failed with status code {response.status_code}")
-                print(f"Error details: {response.text}")
-                # Retry on server errors (5xx) but not on client errors (4xx)
-                if response.status_code >= 500:
-                    retry_count += 1
-                    wait_time = 2 ** retry_count  # Exponential backoff
-                    print(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    continue
-                return
-            
-            # Process the streamed response with better buffering
-            buffer = ""
-            token_counter = 0
-            
-            # Iterate through the response to get tokens
-            for line in response.iter_lines():
-                if line:
-                    line_str = line.decode('utf-8')
-                    if line_str.startswith('data: '):
-                        data_str = line_str[6:]  # Remove the 'data: ' prefix
-                        
-                        if data_str.strip() == '[DONE]':
-                            break
+    try:
+        while retry_count < max_retries:
+            try:
+                # Make the API request with streaming and timeout
+                response = session.post(
+                    API_URL, 
+                    headers=HEADERS, 
+                    json=payload, 
+                    stream=True,
+                    timeout=REQUEST_TIMEOUT
+                )
+                
+                if response.status_code != 200:
+                    print(f"Error: API request failed with status code {response.status_code}")
+                    print(f"Error details: {response.text}")
+                    # Retry on server errors (5xx) but not on client errors (4xx)
+                    if response.status_code >= 500:
+                        retry_count += 1
+                        wait_time = 2 ** retry_count  # Exponential backoff
+                        print(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                        continue
+                    return None
+                
+                # Process the streamed response with better buffering
+                buffer = ""
+                token_counter = 0
+                
+                # Iterate through the response to get tokens
+                for line in response.iter_lines():
+                    if line:
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
+                            data_str = line_str[6:]  # Remove the 'data: ' prefix
                             
-                        try:
-                            data = json.loads(data_str)
-                            if 'choices' in data and len(data['choices']) > 0:
-                                token_text = data['choices'][0].get('text', '')
-                                token_counter += 1
-                                perf_monitor.add_tokens()
+                            if data_str.strip() == '[DONE]':
+                                break
                                 
-                                if token_text:
-                                    yield token_text
-                        except json.JSONDecodeError as e:
-                            print(f"Error decoding JSON: {e}")
-                            continue
-            
-            # Generation completed successfully
-            generation_time = time.time() - start_time
-            tokens_per_second = token_counter / generation_time if generation_time > 0 else 0
-            print(f"Token generation complete: {token_counter} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
-            return
-            
-        except requests.exceptions.Timeout:
-            print(f"Request timed out after {REQUEST_TIMEOUT} seconds")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait_time = 2 ** retry_count
-                print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                print("Max retries reached. Token generation failed.")
+                            try:
+                                data = json.loads(data_str)
+                                if 'choices' in data and len(data['choices']) > 0:
+                                    token_text = data['choices'][0].get('text', '')
+                                    token_counter += 1
+                                    perf_monitor.add_tokens()
+                                    
+                                    if token_text:
+                                        yield token_text
+                            except json.JSONDecodeError as e:
+                                print(f"Error decoding JSON: {e}")
+                                continue
+                
+                # Generation completed successfully
+                generation_time = time.time() - start_time
+                tokens_per_second = token_counter / generation_time if generation_time > 0 else 0
+                print(f"Token generation complete: {token_counter} tokens in {generation_time:.2f}s ({tokens_per_second:.1f} tokens/sec)")
                 return
                 
-        except requests.exceptions.ConnectionError:
-            print(f"Connection error to API at {API_URL}")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait_time = 2 ** retry_count
-                print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                print("Max retries reached. Token generation failed.")
-                return
+            except requests.exceptions.Timeout:
+                print(f"Request timed out after {REQUEST_TIMEOUT} seconds")
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = 2 ** retry_count
+                    print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    print("Max retries reached. Token generation failed.")
+                    return None
+                    
+            except requests.exceptions.ConnectionError:
+                print(f"Connection error to API at {API_URL}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = 2 ** retry_count
+                    print(f"Retrying in {wait_time} seconds... (attempt {retry_count+1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    print("Max retries reached. Token generation failed.")
+                    return None
+    finally:
+        # Always close the session to prevent resource leaks
+        session.close()
 
 # Token ID cache to avoid repeated processing
 token_id_cache = {}
@@ -308,6 +312,14 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
                 audio_samples = convert_to_audio(buffer_to_proc, count)
                 if audio_samples is not None:
                     yield audio_samples
+    
+    # Flush remaining buffer tokens at the end
+    if len(buffer) >= min_frames:
+        buffer_to_proc = buffer[-min_frames:]
+        print(f"Flushing final buffer with {len(buffer_to_proc)} tokens")
+        audio_samples = convert_to_audio(buffer_to_proc, count)
+        if audio_samples is not None:
+            yield audio_samples
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
@@ -348,24 +360,34 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         chunk_count = 0
         last_log_time = start_time
         
-        async for audio_chunk in tokens_decoder(async_token_gen()):
-            audio_queue.put(audio_chunk)
-            chunk_count += 1
-            
-            # Log performance periodically
-            current_time = time.time()
-            if current_time - last_log_time >= 3.0:  # Every 3 seconds
-                elapsed = current_time - start_time
-                if elapsed > 0:
-                    chunks_per_sec = chunk_count / elapsed
-                    print(f"Audio generation rate: {chunks_per_sec:.2f} chunks/second")
-                last_log_time = current_time
+        try:
+            async for audio_chunk in tokens_decoder(async_token_gen()):
+                audio_queue.put(audio_chunk)
+                chunk_count += 1
                 
-        # Signal completion
-        audio_queue.put(None)
+                # Log performance periodically
+                current_time = time.time()
+                if current_time - last_log_time >= 3.0:  # Every 3 seconds
+                    elapsed = current_time - start_time
+                    if elapsed > 0:
+                        chunks_per_sec = chunk_count / elapsed
+                        print(f"Audio generation rate: {chunks_per_sec:.2f} chunks/second")
+                    last_log_time = current_time
+        except Exception as e:
+            print(f"Error in audio producer: {e}")
+            # Signal error by putting None
+        finally:
+            # Signal completion
+            audio_queue.put(None)
 
     def run_async():
-        asyncio.run(async_producer())
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(async_producer())
+        finally:
+            loop.close()
 
     # Use a separate thread with higher priority for producer
     thread = threading.Thread(target=run_async)
@@ -391,7 +413,10 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                     # Write any remaining buffered chunks
                     if write_buffer and wav_file:
                         if future:
-                            future.result()  # Wait for previous write to complete
+                            try:
+                                future.result()  # Wait for previous write to complete
+                            except Exception as e:
+                                print(f"Error in background write: {e}")
                         write_chunks_to_file(write_buffer, wav_file)
                     break
                 
@@ -401,7 +426,11 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                     write_buffer.append(audio)
                     if len(write_buffer) >= buffer_size:
                         if future:
-                            future.result()  # Wait for previous write to complete
+                            try:
+                                future.result()  # Wait for previous write to complete
+                            except Exception as e:
+                                print(f"Error in background write: {e}")
+                                raise
                         # Write in a separate thread to avoid blocking
                         chunks_to_write = write_buffer
                         write_buffer = []
