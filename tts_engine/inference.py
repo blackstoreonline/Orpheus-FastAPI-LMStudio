@@ -416,8 +416,12 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                             try:
                                 future.result()  # Wait for previous write to complete
                             except Exception as e:
-                                print(f"Error in background write: {e}")
-                        write_chunks_to_file(write_buffer, wav_file)
+                                print(f"Error in background write during finalization: {e}")
+                                # Don't re-raise during finalization as we've already got the audio
+                        try:
+                            write_chunks_to_file(write_buffer, wav_file)
+                        except Exception as e:
+                            print(f"Error writing final buffer: {e}")
                     break
                 
                 audio_segments.append(audio)
@@ -430,7 +434,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                                 future.result()  # Wait for previous write to complete
                             except Exception as e:
                                 print(f"Error in background write: {e}")
-                                raise
+                                # Continue processing but log the error
                         # Write in a separate thread to avoid blocking
                         chunks_to_write = write_buffer
                         write_buffer = []
