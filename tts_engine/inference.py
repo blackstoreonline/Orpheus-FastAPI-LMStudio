@@ -417,11 +417,13 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                                 future.result()  # Wait for previous write to complete
                             except Exception as e:
                                 print(f"Error in background write during finalization: {e}")
-                                # Don't re-raise during finalization as we've already got the audio
+                                print(f"Warning: Audio data may not have been fully written to {output_file}")
+                                # Don't re-raise during finalization as we've already got the audio in memory
                         try:
                             write_chunks_to_file(write_buffer, wav_file)
                         except Exception as e:
                             print(f"Error writing final buffer: {e}")
+                            print(f"Warning: Output file {output_file} may be incomplete or corrupted")
                     break
                 
                 audio_segments.append(audio)
