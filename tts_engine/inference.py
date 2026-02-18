@@ -109,7 +109,7 @@ def format_prompt(prompt: str, voice: str = DEFAULT_VOICE) -> str:
 
 def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperature: float = TEMPERATURE, 
                            top_p: float = TOP_P, max_tokens: int = MAX_TOKENS, 
-                           repetition_penalty: float = REPETITION_PENALTY) -> Optional[Generator[str, None, None]]:
+                           repetition_penalty: float = REPETITION_PENALTY) -> Generator[str, None, None]:
     """Generate tokens from text using OpenAI-compatible API with optimized streaming and retry logic."""
     start_time = time.time()
     formatted_prompt = format_prompt(prompt, voice)
@@ -417,13 +417,13 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                                 future.result()  # Wait for previous write to complete
                             except Exception as e:
                                 print(f"Error in background write during finalization: {e}\n"
-                                      f"Warning: Audio data may not have been fully written to {output_file}")
+                                      f"Warning: Audio data may not have been fully written to disk")
                                 # Don't re-raise during finalization as we've already got the audio in memory
                         try:
                             write_chunks_to_file(write_buffer, wav_file)
                         except Exception as e:
                             print(f"Error writing final buffer: {e}\n"
-                                  f"Warning: Output file {output_file} may be incomplete or corrupted")
+                                  f"Warning: Output file may be incomplete or corrupted")
                     break
                 
                 audio_segments.append(audio)
