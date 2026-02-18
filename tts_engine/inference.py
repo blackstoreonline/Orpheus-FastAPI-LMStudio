@@ -159,7 +159,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                         print(f"Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                         continue
-                    return None
+                    return
                 
                 # Process the streamed response with better buffering
                 buffer = ""
@@ -203,7 +203,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                     time.sleep(wait_time)
                 else:
                     print("Max retries reached. Token generation failed.")
-                    return None
+                    return
                     
             except requests.exceptions.ConnectionError:
                 print(f"Connection error to API at {API_URL}")
@@ -214,7 +214,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                     time.sleep(wait_time)
                 else:
                     print("Max retries reached. Token generation failed.")
-                    return None
+                    return
     finally:
         # Always close the session to prevent resource leaks
         session.close()
@@ -416,14 +416,14 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                             try:
                                 future.result()  # Wait for previous write to complete
                             except Exception as e:
-                                print(f"Error in background write during finalization: {e}")
-                                print(f"Warning: Audio data may not have been fully written to {output_file}")
+                                print(f"Error in background write during finalization: {e}\n"
+                                      f"Warning: Audio data may not have been fully written to {output_file}")
                                 # Don't re-raise during finalization as we've already got the audio in memory
                         try:
                             write_chunks_to_file(write_buffer, wav_file)
                         except Exception as e:
-                            print(f"Error writing final buffer: {e}")
-                            print(f"Warning: Output file {output_file} may be incomplete or corrupted")
+                            print(f"Error writing final buffer: {e}\n"
+                                  f"Warning: Output file {output_file} may be incomplete or corrupted")
                     break
                 
                 audio_segments.append(audio)

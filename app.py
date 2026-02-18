@@ -320,8 +320,12 @@ async def speak_legacy(request: Request):
     text = data.get("text", "")
     voice = data.get("voice", DEFAULT_VOICE)
 
-    if not text or not text.strip():
-        return create_error_response("missing_text", "Missing or empty 'text' field in request")
+    # Check for None or empty string before calling strip()
+    if not text:
+        return create_error_response("missing_text", "Missing 'text' field in request")
+    
+    if not text.strip():
+        return create_error_response("missing_text", "Empty 'text' field in request")
 
     if voice not in AVAILABLE_VOICES:
         return create_error_response(

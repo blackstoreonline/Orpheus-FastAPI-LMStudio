@@ -274,6 +274,6 @@ def tokens_decoder_sync(syn_token_gen):
     # Join thread with timeout to avoid hanging
     thread.join(timeout=30)
     if thread.is_alive():
-        print("Warning: Audio producer thread did not terminate cleanly within timeout")
-        print("This may indicate resource leaks or incomplete audio generation")
-        print("Check for errors in token processing or audio conversion")
+        print("Warning: Audio producer thread did not terminate cleanly within timeout. "
+              "This may indicate resource leaks or incomplete audio generation. "
+              "Check for errors in token processing or audio conversion")
