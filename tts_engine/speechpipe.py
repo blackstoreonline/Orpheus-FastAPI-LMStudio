@@ -9,12 +9,14 @@ import time
 # Configuration constants
 CUDA_CACHE_CLEAR_INTERVAL = 100  # Clear CUDA cache every N iterations to prevent fragmentation
 SSE_DATA_PREFIX = "data: "  # Server-Sent Events data prefix
+SSE_DATA_PREFIX_LEN = len(SSE_DATA_PREFIX)  # Pre-computed length for efficiency
 
 # Device detection and optimization flags
 DEVICE_TYPE = "cpu"
 HAS_CUDA = torch.cuda.is_available()
 HAS_MPS = torch.backends.mps.is_available()
 HAS_GPU = HAS_CUDA or HAS_MPS
+GPU_MEMORY_GB = 0  # Default for non-CUDA devices
 
 if HAS_CUDA:
     DEVICE_TYPE = "cuda"
@@ -235,9 +237,8 @@ async def tokens_decoder(token_gen):
 # ------------------ Synchronous Tokens Decoder Wrapper ------------------ #
 def tokens_decoder_sync(syn_token_gen):
     """Optimized synchronous decoder with device-appropriate settings"""
-    # Use device-appropriate queue size
+    # Use device-appropriate queue size based on GPU memory (computed at module load)
     if DEVICE_TYPE == "cuda":
-        GPU_MEMORY_GB = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         if GPU_MEMORY_GB >= 16:  # High-end GPU
             max_queue_size = 32
             batch_size = 16

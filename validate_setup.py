@@ -8,6 +8,10 @@ device detection is working correctly.
 import sys
 import os
 
+# Python version requirements
+MIN_PYTHON_MAJOR = 3
+MIN_PYTHON_MINOR = 10
+
 def check_python_version():
     """Check if Python version meets requirements."""
     print("=" * 60)
@@ -15,8 +19,8 @@ def check_python_version():
     version = sys.version_info
     print(f"Python {version.major}.{version.minor}.{version.micro}")
     
-    if version.major < 3 or (version.major == 3 and version.minor < 10):
-        print("❌ ERROR: Python 3.10+ is required")
+    if version.major < MIN_PYTHON_MAJOR or (version.major == MIN_PYTHON_MAJOR and version.minor < MIN_PYTHON_MINOR):
+        print(f"❌ ERROR: Python {MIN_PYTHON_MAJOR}.{MIN_PYTHON_MINOR}+ is required")
         return False
     print("✓ Python version is compatible")
     return True

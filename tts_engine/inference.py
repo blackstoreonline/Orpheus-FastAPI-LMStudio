@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 
 # Configuration constants
 SSE_DATA_PREFIX = "data: "  # Server-Sent Events data prefix for streaming responses
+SSE_DATA_PREFIX_LEN = len(SSE_DATA_PREFIX)  # Pre-computed length for efficiency
 
 # Detect device capabilities and optimize accordingly
 import torch
@@ -220,7 +221,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 for line in response.iter_lines(decode_unicode=True):
                     if line:
                         if line.startswith(SSE_DATA_PREFIX):
-                            data_str = line[len(SSE_DATA_PREFIX):]  # Remove the prefix
+                            data_str = line[SSE_DATA_PREFIX_LEN:]  # Remove the prefix efficiently
                             
                             if data_str.strip() == '[DONE]':
                                 break
