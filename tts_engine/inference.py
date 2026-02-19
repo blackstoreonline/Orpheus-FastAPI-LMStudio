@@ -218,6 +218,7 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 token_counter = 0
                 
                 # Iterate through the response to get tokens
+                # decode_unicode=True returns strings, not bytes
                 for line in response.iter_lines(decode_unicode=True):
                     if line:
                         if line.startswith(SSE_DATA_PREFIX):

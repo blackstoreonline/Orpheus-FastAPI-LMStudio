@@ -148,8 +148,8 @@ def convert_to_audio(multiframe, count):
             audio_int16_tensor = (audio_slice * 32767).to(torch.int16)
             audio_bytes = audio_int16_tensor.cpu().numpy().tobytes()
         else:
-            # CPU - already on CPU, use NumPy directly
-            audio_np = audio_slice.numpy()
+            # CPU - ensure tensor is on CPU and detached before conversion
+            audio_np = audio_slice.detach().cpu().numpy()
             audio_int16 = (audio_np * 32767).astype(np.int16)
             audio_bytes = audio_int16.tobytes()
     

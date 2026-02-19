@@ -287,10 +287,12 @@ Orpheus-FastAPI automatically detects your hardware and optimizes performance:
 
 | Device Type | Min VRAM (GPU) | Min System RAM | Recommended | Max Audio Length |
 |-------------|----------------|----------------|-------------|------------------|
-| High-end GPU (24GB+) | 4GB | 8GB | 16GB+ System RAM | 2+ minutes |
-| Mid-range GPU (8-16GB) | 4GB | 8GB | 12GB+ System RAM | 1.5 minutes |
-| Low-end GPU (4-8GB) | 4GB | 8GB | 12GB+ System RAM | 1 minute |
+| High-end GPU (24GB+) | 4GB* | 8GB | 16GB+ System RAM | 2+ minutes |
+| Mid-range GPU (8-16GB) | 4GB* | 8GB | 12GB+ System RAM | 1.5 minutes |
+| Low-end GPU (4-8GB) | 4GB* | 8GB | 12GB+ System RAM | 1 minute |
 | CPU | N/A | 8GB | 16GB+ System RAM | 1 minute |
+
+*The SNAC model requires ~4GB VRAM regardless of GPU tier. Larger VRAM allows for more parallel processing and longer audio generation.
 
 ---
 
