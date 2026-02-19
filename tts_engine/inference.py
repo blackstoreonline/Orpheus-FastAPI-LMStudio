@@ -13,15 +13,44 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 
-# Detect if we're on a high-end system like RTX 4090
+# Configuration constants
+SSE_DATA_PREFIX = "data: "  # Server-Sent Events data prefix for streaming responses
+SSE_DATA_PREFIX_LEN = len(SSE_DATA_PREFIX)  # Pre-computed length for efficiency
+
+# Detect device capabilities and optimize accordingly
 import torch
+
+# Device detection and capability assessment
+DEVICE_TYPE = "cpu"  # Default
 HIGH_END_GPU = False
+MID_RANGE_GPU = False
+LOW_END_GPU = False
+HAS_GPU = False
+
 if torch.cuda.is_available():
+    HAS_GPU = True
+    DEVICE_TYPE = "cuda"
     gpu_name = torch.cuda.get_device_name(0).lower()
-    if any(x in gpu_name for x in ['4090', '3090', 'a100', 'h100']):
+    gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+    
+    print(f"GPU detected: {torch.cuda.get_device_name(0)} ({gpu_memory_gb:.1f} GB)")
+    
+    # Classify GPU by performance tier
+    if any(x in gpu_name for x in ['4090', '3090', 'a100', 'h100', 'v100']):
         HIGH_END_GPU = True
-        print(f"High-end GPU detected: {torch.cuda.get_device_name(0)}")
-        print("Enabling high-performance optimizations")
+        print("High-end GPU detected - enabling maximum performance optimizations")
+    elif any(x in gpu_name for x in ['4080', '3080', '3070', '2080', '2070', 'rtx', 'a6000', 'a5000']):
+        MID_RANGE_GPU = True
+        print("Mid-range GPU detected - enabling balanced optimizations")
+    else:
+        LOW_END_GPU = True
+        print("GPU detected - enabling conservative optimizations")
+elif torch.backends.mps.is_available():
+    HAS_GPU = True
+    DEVICE_TYPE = "mps"
+    print("Apple Metal Performance Shaders (MPS) detected - enabling Apple Silicon optimizations")
+else:
+    print("No GPU detected - using CPU with optimized settings")
 
 # Orpheus-FASTAPI settings - make configurable for different endpoints
 API_URL = os.environ.get("ORPHEUS_API_URL", "http://127.0.0.1:1234/v1/completions")
@@ -32,15 +61,34 @@ HEADERS = {
 # Better timeout handling for API requests
 REQUEST_TIMEOUT = int(os.environ.get("ORPHEUS_API_TIMEOUT", "120"))  # 120 seconds default for long generations
 
-# Model parameters - optimized defaults for high-end GPUs
-MAX_TOKENS = 8192 if HIGH_END_GPU else 8192  # Significantly increased for RTX 4090 to allow ~1.5-2 minutes of audio
+# Model parameters - dynamically adjusted based on device capabilities
+if HIGH_END_GPU:
+    MAX_TOKENS = 8192
+    NUM_WORKERS = 4
+    BATCH_SIZE = 32
+    QUEUE_SIZE = 100
+elif MID_RANGE_GPU:
+    MAX_TOKENS = 6144
+    NUM_WORKERS = 3
+    BATCH_SIZE = 24
+    QUEUE_SIZE = 75
+elif LOW_END_GPU:
+    MAX_TOKENS = 4096
+    NUM_WORKERS = 2
+    BATCH_SIZE = 16
+    QUEUE_SIZE = 50
+else:  # CPU
+    MAX_TOKENS = 4096
+    NUM_WORKERS = 2  # Use CPU cores efficiently
+    BATCH_SIZE = 8
+    QUEUE_SIZE = 25
+
 TEMPERATURE = 0.6 
 TOP_P = 0.9
 REPETITION_PENALTY = 1.1
 SAMPLE_RATE = 24000  # SNAC model uses 24kHz
 
-# Parallel processing settings
-NUM_WORKERS = 4 if HIGH_END_GPU else 2
+print(f"Configuration: MAX_TOKENS={MAX_TOKENS}, BATCH_SIZE={BATCH_SIZE}, NUM_WORKERS={NUM_WORKERS}")
 
 # Available voices based on the Orpheus-TTS repository
 AVAILABLE_VOICES = ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"]
@@ -115,10 +163,15 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     formatted_prompt = format_prompt(prompt, voice)
     print(f"Generating speech for: {formatted_prompt}")
     
-    # Optimize the token generation for high-end GPUs
+    # Optimize the token generation based on device
     if HIGH_END_GPU:
-        # Use more aggressive parameters for faster generation on high-end GPUs
         print("Using optimized parameters for high-end GPU")
+    elif MID_RANGE_GPU:
+        print("Using balanced parameters for mid-range GPU")
+    elif HAS_GPU:
+        print("Using conservative parameters for GPU")
+    else:
+        print("Using CPU-optimized parameters")
     
     # Create the request payload
     payload = {
@@ -162,15 +215,14 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                     return
                 
                 # Process the streamed response with better buffering
-                buffer = ""
                 token_counter = 0
                 
                 # Iterate through the response to get tokens
-                for line in response.iter_lines():
+                # decode_unicode=True returns strings, not bytes
+                for line in response.iter_lines(decode_unicode=True):
                     if line:
-                        line_str = line.decode('utf-8')
-                        if line_str.startswith('data: '):
-                            data_str = line_str[6:]  # Remove the 'data: ' prefix
+                        if line.startswith(SSE_DATA_PREFIX):
+                            data_str = line[SSE_DATA_PREFIX_LEN:]  # Remove the prefix efficiently
                             
                             if data_str.strip() == '[DONE]':
                                 break
@@ -323,9 +375,8 @@ async def tokens_decoder(token_gen) -> Generator[bytes, None, None]:
 
 def tokens_decoder_sync(syn_token_gen, output_file=None):
     """Optimized synchronous wrapper with parallel processing and efficient file I/O."""
-    # Use a larger queue for high-end systems
-    queue_size = 100 if HIGH_END_GPU else 50
-    audio_queue = queue.Queue(maxsize=queue_size)
+    # Use device-appropriate queue size
+    audio_queue = queue.Queue(maxsize=QUEUE_SIZE)
     audio_segments = []
     
     # If output_file is provided, prepare WAV file with buffered I/O
@@ -338,15 +389,12 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
         wav_file.setsampwidth(2)
         wav_file.setframerate(SAMPLE_RATE)
     
-    # Batch processing of tokens for improved throughput
-    batch_size = 32 if HIGH_END_GPU else 16
-    
     # Convert the synchronous token generator into an async generator with batching
     async def async_token_gen():
         batch = []
         for token in syn_token_gen:
             batch.append(token)
-            if len(batch) >= batch_size:
+            if len(batch) >= BATCH_SIZE:
                 for t in batch:
                     yield t
                 batch = []
@@ -394,8 +442,8 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
     thread.daemon = True  # Allow thread to be terminated when main thread exits
     thread.start()
     
-    # For high-end GPUs, use a ThreadPoolExecutor for parallel file I/O
-    if HIGH_END_GPU and wav_file:
+    # For GPU systems, use a ThreadPoolExecutor for parallel file I/O
+    if HAS_GPU and wav_file:
         # Buffer for collecting chunks before writing
         write_buffer = []
         buffer_size = 10  # Write every 10 chunks
@@ -442,7 +490,7 @@ def tokens_decoder_sync(syn_token_gen, output_file=None):
                         write_buffer = []
                         future = executor.submit(write_chunks_to_file, chunks_to_write, wav_file)
     else:
-        # Simpler direct approach for lower-end systems
+        # Simpler direct approach for CPU or lower-end systems
         while True:
             audio = audio_queue.get()
             if audio is None:
@@ -500,7 +548,17 @@ def generate_speech_from_api(prompt, voice=DEFAULT_VOICE, output_file=None, temp
                      top_p=TOP_P, max_tokens=MAX_TOKENS, repetition_penalty=REPETITION_PENALTY):
     """Generate speech from text using Orpheus model with performance optimizations."""
     print(f"Starting speech generation for '{prompt[:50]}{'...' if len(prompt) > 50 else ''}'")
-    print(f"Using voice: {voice}, GPU acceleration: {'Yes (High-end)' if HIGH_END_GPU else 'Yes' if torch.cuda.is_available() else 'No'}")
+    print(f"Using voice: {voice}")
+    print(f"Device: {DEVICE_TYPE.upper()}, GPU acceleration: {'Yes' if HAS_GPU else 'No'}")
+    if HAS_GPU:
+        if HIGH_END_GPU:
+            print("Performance mode: High-end GPU optimizations")
+        elif MID_RANGE_GPU:
+            print("Performance mode: Mid-range GPU optimizations")
+        else:
+            print("Performance mode: Conservative GPU optimizations")
+    else:
+        print("Performance mode: CPU optimizations")
     
     # Reset performance monitor
     global perf_monitor

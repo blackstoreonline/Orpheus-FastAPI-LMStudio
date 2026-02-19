@@ -75,7 +75,10 @@ Orpheus-FastAPI/
 ### Prerequisites
 
 - Python 3.10+
-- CUDA-compatible GPU (RTX series recommended)
+- **For GPU acceleration (recommended)**:
+  - NVIDIA GPU with CUDA support (RTX series recommended), or
+  - Apple Silicon (M1/M2/M3 with MPS support)
+- **CPU-only mode** is also supported but will be slower
 - LM Studio or compatible LLM inference server
 
 ### Installation
@@ -89,15 +92,41 @@ cd Orpheus-FastAPI-LMStudio
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install PyTorch with CUDA
+# Install PyTorch (choose based on your system)
+
+# For NVIDIA GPU (CUDA 12.4):
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-# Install dependencies
+# For NVIDIA GPU (CUDA 11.8):
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# For Apple Silicon (M1/M2/M3):
+pip3 install torch torchvision torchaudio
+
+# For CPU only:
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install other dependencies
 pip3 install -r requirements.txt
 
 # Create required directories
 mkdir -p outputs static
 ```
+
+### Verify Installation
+
+After installation, run the validation script to check your setup:
+
+```bash
+python validate_setup.py
+```
+
+This will check:
+- Python version compatibility
+- All required dependencies
+- PyTorch and device detection (CPU/GPU)
+- Directory structure
+- TTS engine configuration
 
 ### Start the Server
 
@@ -226,6 +255,44 @@ Add expressive emotions to your speech:
 
 ![LM Studio Orpheus Model](https://github.com/TheLocalLab/Orpheus-FastAPI-LMStudio/blob/8c9eb86b4c42a0ce60d8089c1b6a07d3635ae908/static/Lmstudio1.png)
 ![LM Studio Server API](https://github.com/TheLocalLab/Orpheus-FastAPI-LMStudio/blob/8c9eb86b4c42a0ce60d8089c1b6a07d3635ae908/static/Lmstudio.png)
+
+---
+
+## ⚡ Performance & Optimization
+
+### CPU and GPU Compatibility
+
+Orpheus-FastAPI automatically detects your hardware and optimizes performance:
+
+**GPU Support:**
+- ✅ **NVIDIA CUDA** - Optimal performance with CUDA-enabled GPUs (RTX series recommended)
+- ✅ **Apple Silicon (MPS)** - Native support for M1/M2/M3 chips
+- ✅ **CPU Fallback** - Runs efficiently on CPU when GPU is unavailable
+
+**Automatic Optimization:**
+- Detects GPU tier (High-end, Mid-range, Low-end) and adjusts batch sizes
+- Configures memory buffers based on available VRAM
+- Optimizes thread pools for CPU-only systems
+- Adjusts token generation limits based on hardware capabilities
+
+**Performance Tips:**
+- **GPU Systems**: Install PyTorch with CUDA for best performance
+- **Apple Silicon**: PyTorch automatically uses MPS backend
+- **CPU Systems**: Enable multithreading, expects slower generation
+- **High-end GPUs (RTX 4090, A100)**: Get 2-4x realtime generation speed
+- **Mid-range GPUs (RTX 3070-4080)**: Get 1-2x realtime generation speed
+- **CPU**: Expect slower than realtime, but still functional
+
+### Memory Requirements
+
+| Device Type | Min VRAM (GPU) | Min System RAM | Recommended | Max Audio Length |
+|-------------|----------------|----------------|-------------|------------------|
+| High-end GPU (24GB+) | 4GB* | 8GB | 16GB+ System RAM | 2+ minutes |
+| Mid-range GPU (8-16GB) | 4GB* | 8GB | 12GB+ System RAM | 1.5 minutes |
+| Low-end GPU (4-8GB) | 4GB* | 8GB | 12GB+ System RAM | 1 minute |
+| CPU | N/A | 8GB | 16GB+ System RAM | 1 minute |
+
+*The SNAC model requires ~4GB VRAM regardless of GPU tier. Larger VRAM allows for more parallel processing and longer audio generation.
 
 ---
 
