@@ -6,6 +6,10 @@ import threading
 import queue
 import time
 
+# Configuration constants
+CUDA_CACHE_CLEAR_INTERVAL = 100  # Clear CUDA cache every N iterations to prevent fragmentation
+SSE_DATA_PREFIX = "data: "  # Server-Sent Events data prefix
+
 # Device detection and optimization flags
 DEVICE_TYPE = "cpu"
 HAS_CUDA = torch.cuda.is_available()
@@ -50,9 +54,9 @@ if DEVICE_TYPE == "cuda":
     torch.backends.cudnn.allow_tf32 = True
     print("CUDA optimizations enabled: cuDNN benchmark, TF32")
 elif DEVICE_TYPE == "cpu":
-    # Optimize for CPU
-    torch.set_num_threads(torch.get_num_threads())  # Use all available threads
-    print(f"CPU optimizations enabled: {torch.get_num_threads()} threads")
+    # Optimize for CPU - use all available threads for parallel processing
+    num_threads = torch.get_num_threads()
+    print(f"CPU optimizations enabled: {num_threads} threads")
 
 model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").eval()
 
@@ -148,7 +152,7 @@ def convert_to_audio(multiframe, count):
             audio_bytes = audio_int16.tobytes()
     
     # Periodic memory cleanup for CUDA to prevent memory fragmentation
-    if DEVICE_TYPE == "cuda" and count % 100 == 0:
+    if DEVICE_TYPE == "cuda" and count % CUDA_CACHE_CLEAR_INTERVAL == 0:
         torch.cuda.empty_cache()
             
     return audio_bytes

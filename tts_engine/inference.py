@@ -13,6 +13,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 
+# Configuration constants
+SSE_DATA_PREFIX = "data: "  # Server-Sent Events data prefix for streaming responses
+
 # Detect device capabilities and optimize accordingly
 import torch
 
@@ -216,8 +219,8 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                 # Iterate through the response to get tokens
                 for line in response.iter_lines(decode_unicode=True):
                     if line:
-                        if line.startswith('data: '):
-                            data_str = line[6:]  # Remove the 'data: ' prefix
+                        if line.startswith(SSE_DATA_PREFIX):
+                            data_str = line[len(SSE_DATA_PREFIX):]  # Remove the prefix
                             
                             if data_str.strip() == '[DONE]':
                                 break

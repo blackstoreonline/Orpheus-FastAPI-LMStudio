@@ -285,12 +285,12 @@ Orpheus-FastAPI automatically detects your hardware and optimizes performance:
 
 ### Memory Requirements
 
-| Device Type | Min RAM/VRAM | Recommended | Max Audio Length |
-|-------------|--------------|-------------|------------------|
-| High-end GPU (24GB+) | 8GB System RAM | 16GB+ System RAM | 2+ minutes |
-| Mid-range GPU (8-16GB) | 8GB System RAM | 12GB+ System RAM | 1.5 minutes |
-| Low-end GPU (4-8GB) | 8GB System RAM | 12GB+ System RAM | 1 minute |
-| CPU | 8GB System RAM | 16GB+ System RAM | 1 minute |
+| Device Type | Min VRAM (GPU) | Min System RAM | Recommended | Max Audio Length |
+|-------------|----------------|----------------|-------------|------------------|
+| High-end GPU (24GB+) | 4GB | 8GB | 16GB+ System RAM | 2+ minutes |
+| Mid-range GPU (8-16GB) | 4GB | 8GB | 12GB+ System RAM | 1.5 minutes |
+| Low-end GPU (4-8GB) | 4GB | 8GB | 12GB+ System RAM | 1 minute |
+| CPU | N/A | 8GB | 16GB+ System RAM | 1 minute |
 
 ---
 
