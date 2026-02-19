@@ -29,6 +29,19 @@ sounddevice>=0.4.6
 snac>=0.3.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PyTorch - Install separately with CUDA support:
-# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# PyTorch - Install separately based on your system:
+# 
+# For NVIDIA GPU with CUDA 12.4:
+#   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# 
+# For NVIDIA GPU with CUDA 11.8:
+#   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# 
+# For Apple Silicon (M1/M2/M3):
+#   pip3 install torch torchvision torchaudio
+# 
+# For CPU only:
+#   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# 
+# After installing PyTorch, run: python validate_setup.py
 # ═══════════════════════════════════════════════════════════════════════════════

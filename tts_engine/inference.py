@@ -159,10 +159,15 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
     formatted_prompt = format_prompt(prompt, voice)
     print(f"Generating speech for: {formatted_prompt}")
     
-    # Optimize the token generation for high-end GPUs
+    # Optimize the token generation based on device
     if HIGH_END_GPU:
-        # Use more aggressive parameters for faster generation on high-end GPUs
         print("Using optimized parameters for high-end GPU")
+    elif MID_RANGE_GPU:
+        print("Using balanced parameters for mid-range GPU")
+    elif HAS_GPU:
+        print("Using conservative parameters for GPU")
+    else:
+        print("Using CPU-optimized parameters")
     
     # Create the request payload
     payload = {
@@ -206,15 +211,13 @@ def generate_tokens_from_api(prompt: str, voice: str = DEFAULT_VOICE, temperatur
                     return
                 
                 # Process the streamed response with better buffering
-                buffer = ""
                 token_counter = 0
                 
                 # Iterate through the response to get tokens
-                for line in response.iter_lines():
+                for line in response.iter_lines(decode_unicode=True):
                     if line:
-                        line_str = line.decode('utf-8')
-                        if line_str.startswith('data: '):
-                            data_str = line_str[6:]  # Remove the 'data: ' prefix
+                        if line.startswith('data: '):
+                            data_str = line[6:]  # Remove the 'data: ' prefix
                             
                             if data_str.strip() == '[DONE]':
                                 break

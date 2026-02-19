@@ -113,6 +113,21 @@ pip3 install -r requirements.txt
 mkdir -p outputs static
 ```
 
+### Verify Installation
+
+After installation, run the validation script to check your setup:
+
+```bash
+python validate_setup.py
+```
+
+This will check:
+- Python version compatibility
+- All required dependencies
+- PyTorch and device detection (CPU/GPU)
+- Directory structure
+- TTS engine configuration
+
 ### Start the Server
 
 ```bash

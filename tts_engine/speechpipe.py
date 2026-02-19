@@ -146,6 +146,10 @@ def convert_to_audio(multiframe, count):
             audio_np = audio_slice.numpy()
             audio_int16 = (audio_np * 32767).astype(np.int16)
             audio_bytes = audio_int16.tobytes()
+    
+    # Periodic memory cleanup for CUDA to prevent memory fragmentation
+    if DEVICE_TYPE == "cuda" and count % 100 == 0:
+        torch.cuda.empty_cache()
             
     return audio_bytes
 
